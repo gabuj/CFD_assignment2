@@ -35,7 +35,7 @@ program navierstokes
 
   ! AB2 temporal scheme itemp=1
   ! RK3 temporal scheme itemp=2
-  itemp=2
+  itemp=1
 
   ! Subroutine for the initialisation of the variables 
   call initl(uuu,vvv,rho,eee,pre,tmp,rou,rov,roe,nx,ny,xlx,yly, &
@@ -99,8 +99,8 @@ program navierstokes
         enddo
 
         !computation of the vorticity
-        call derix4(vvv,nx,ny,tvv,xlx)
-        call deriy4(uuu,nx,ny,tuu,yly)
+        call derix(vvv,nx,ny,tvv,xlx)
+        call deriy(uuu,nx,ny,tuu,yly)
         do j=1,ny
         do i=1,nx
            wz(i,j)=tvv(i,j)-tuu(i,j)
@@ -293,21 +293,8 @@ subroutine derix4(phi,nx,ny,dfi,xlx)
 
   real(8),dimension(nx,ny) :: phi,dfi
   real(8) :: dlx,xlx,udx
-  integer :: i,j,nx,ny,im1,im2,ip1,ip2
+  integer :: i,j,nx,ny
 	
-   dlx=xlx/nx
-   udx = 1.0d0 / (12.0d0 * dlx)
-
-  do j=1,ny
-     do i=1,nx
-        im1 = i - 1; if (im1 < 1) im1 = im1 + nx
-        im2 = i - 2; if (im2 < 1) im2 = im2 + nx
-        ip1 = i + 1; if (ip1 > nx) ip1 = ip1 - nx
-        ip2 = i + 2; if (ip2 > nx) ip2 = ip2 - nx
-
-        dfi(i,j) = udx * (phi(im2,j) - 8.0d0*phi(im1,j) + 8.0d0*phi(ip1,j) - phi(ip2,j))
-     enddo
-  enddo
 
 	
   return
@@ -325,20 +312,9 @@ subroutine deriy4(phi,nx,ny,dfi,yly)
   
   real(8),dimension(nx,ny) ::  phi,dfi
   real(8) :: dly,yly,udy
-  integer :: i,j,nx,ny,jm1,jm2,jp1,jp2
+  integer :: i,j,nx,ny
 	
-  dly=yly/ny
-  udy = 1.0d0 / (12.0d0 * dly)
 
-  do j=1,ny
-     jm1 = j - 1; if (jm1 < 1) jm1 = jm1 + ny
-     jm2 = j - 2; if (jm2 < 1) jm2 = jm2 + ny
-     jp1 = j + 1; if (jp1 > ny) jp1 = jp1 - ny
-     jp2 = j + 2; if (jp2 > ny) jp2 = jp2 - ny
-     do i=1,nx
-        dfi(i,j) = udy * (phi(i,jm2) - 8.0d0*phi(i,jm1) + 8.0d0*phi(i,jp1) - phi(i,jp2))
-     enddo
-  enddo
 	
   return
 end subroutine deriy4
@@ -355,21 +331,9 @@ subroutine derxx4(phi,nx,ny,dfi,xlx)
 
   real(8),dimension(nx,ny) ::  phi,dfi
   real(8) :: dlx,xlx,udx
-  integer :: i,j,nx,ny,im1,im2,ip1,ip2
-  
-  dlx=xlx/nx
-  udx = 1.0d0 / (12.0d0 * dlx * dlx)
+  integer :: i,j,nx,ny
 
-  do j=1,ny
-     do i=1,nx
-        im1 = i - 1; if (im1 < 1) im1 = im1 + nx
-        im2 = i - 2; if (im2 < 1) im2 = im2 + nx
-        ip1 = i + 1; if (ip1 > nx) ip1 = ip1 - nx
-        ip2 = i + 2; if (ip2 > nx) ip2 = ip2 - nx
 
-        dfi(i,j) = udx * (-phi(im2,j) + 16.0d0*phi(im1,j) - 30.0d0*phi(i,j) + 16.0d0*phi(ip1,j) - phi(ip2,j))
-     enddo
-  enddo
 	
   return
 end subroutine derxx4
@@ -386,20 +350,9 @@ subroutine deryy4(phi,nx,ny,dfi,yly)
 
   real(8),dimension(nx,ny) ::  phi,dfi
   real(8) :: dly,yly,udy
-  integer :: i,j,nx,ny,jm1,jm2,jp1,jp2
-  dly=yly/ny
-  udy = 1.0d0 / (12.0d0 * dly * dly)
+  integer :: i,j,nx,ny
 
-  do j=1,ny
-     jm1 = j - 1; if (jm1 < 1) jm1 = jm1 + ny
-     jm2 = j - 2; if (jm2 < 1) jm2 = jm2 + ny
-     jp1 = j + 1; if (jp1 > ny) jp1 = jp1 - ny
-     jp2 = j + 2; if (jp2 > ny) jp2 = jp2 - ny
-     do i=1,nx
-        dfi(i,j) = udy * (-phi(i,jm2) + 16.0d0*phi(i,jm1) - 30.0d0*phi(i,j) &
-                           + 16.0d0*phi(i,jp1) - phi(i,jp2))
-     enddo
-  enddo
+
 	
   return
 end subroutine deryy4
@@ -422,8 +375,8 @@ subroutine fluxx(uuu,vvv,rho,pre,tmp,rou,rov,roe,nx,ny,tb1,tb2,tb3,&
   real(8) :: utt,qtt,xmu,dmu,xlx,yly,xba,xkt
   integer :: i,j,nx,ny
 
-  call derix4(rou,nx,ny,tb1,xlx)
-  call deriy4(rov,nx,ny,tb2,yly)
+  call derix(rou,nx,ny,tb1,xlx)
+  call deriy(rov,nx,ny,tb2,yly)
   do j=1,ny
      do i=1,nx
         fro(i,j)=-tb1(i,j)-tb2(i,j)
@@ -437,13 +390,13 @@ subroutine fluxx(uuu,vvv,rho,pre,tmp,rou,rov,roe,nx,ny,tb1,tb2,tb3,&
      enddo
   enddo
 	
-  call derix4(pre,nx,ny,tb3,xlx)
-  call derix4(tb1,nx,ny,tb4,xlx)
-  call deriy4(tb2,nx,ny,tb5,yly)
-  call derxx4(uuu,nx,ny,tb6,xlx)
-  call deryy4(uuu,nx,ny,tb7,yly)
-  call derix4(vvv,nx,ny,tb8,xlx)
-  call deriy4(tb8,nx,ny,tb9,yly)
+  call derix(pre,nx,ny,tb3,xlx)
+  call derix(tb1,nx,ny,tb4,xlx)
+  call deriy(tb2,nx,ny,tb5,yly)
+  call derxx(uuu,nx,ny,tb6,xlx)
+  call deryy(uuu,nx,ny,tb7,yly)
+  call derix(vvv,nx,ny,tb8,xlx)
+  call deriy(tb8,nx,ny,tb9,yly)
   utt=1./3
   qtt=4./3
   do j=1,ny
@@ -461,13 +414,13 @@ subroutine fluxx(uuu,vvv,rho,pre,tmp,rou,rov,roe,nx,ny,tb1,tb2,tb3,&
      enddo
   enddo
 	
-  call deriy4(pre,nx,ny,tb3,yly)
-  call derix4(tb1,nx,ny,tb4,xlx)
-  call deriy4(tb2,nx,ny,tb5,yly)
-  call derxx4(vvv,nx,ny,tb6,xlx)
-  call deryy4(vvv,nx,ny,tb7,yly)
-  call derix4(uuu,nx,ny,tb8,xlx)
-  call deriy4(tb8,nx,ny,tb9,yly)
+  call deriy(pre,nx,ny,tb3,yly)
+  call derix(tb1,nx,ny,tb4,xlx)
+  call deriy(tb2,nx,ny,tb5,yly)
+  call derxx(vvv,nx,ny,tb6,xlx)
+  call deryy(vvv,nx,ny,tb7,yly)
+  call derix(uuu,nx,ny,tb8,xlx)
+  call deriy(tb8,nx,ny,tb9,yly)
   do j=1,ny
      do i=1,nx
         tbb(i,j)=xmu*(tb6(i,j)+qtt*tb7(i,j)+utt*tb9(i,j))
@@ -479,10 +432,10 @@ subroutine fluxx(uuu,vvv,rho,pre,tmp,rou,rov,roe,nx,ny,tb1,tb2,tb3,&
 !
 !Equation for the energy
 !
-  call derix4(uuu,nx,ny,tb1,xlx)
-  call deriy4(vvv,nx,ny,tb2,yly)
-  call deriy4(uuu,nx,ny,tb3,yly)
-  call derix4(vvv,nx,ny,tb4,xlx)
+  call derix(uuu,nx,ny,tb1,xlx)
+  call deriy(vvv,nx,ny,tb2,yly)
+  call deriy(uuu,nx,ny,tb3,yly)
+  call derix(vvv,nx,ny,tb4,xlx)
   dmu=2./3*xmu
   do j=1,ny
      do i=1,nx
@@ -502,12 +455,12 @@ subroutine fluxx(uuu,vvv,rho,pre,tmp,rou,rov,roe,nx,ny,tb1,tb2,tb3,&
      enddo
   enddo
 
-  call derix4(tb1,nx,ny,tb5,xlx)
-  call derix4(tb2,nx,ny,tb6,xlx)
-  call deriy4(tb3,nx,ny,tb7,yly)
-  call deriy4(tb4,nx,ny,tb8,yly)
-  call derxx4(tmp,nx,ny,tb9,xlx)
-  call deryy4(tmp,nx,ny,tba,yly)
+  call derix(tb1,nx,ny,tb5,xlx)
+  call derix(tb2,nx,ny,tb6,xlx)
+  call deriy(tb3,nx,ny,tb7,yly)
+  call deriy(tb4,nx,ny,tb8,yly)
+  call derxx(tmp,nx,ny,tb9,xlx)
+  call deryy(tmp,nx,ny,tba,yly)
    
   do j=1,ny
      do i=1,nx
@@ -535,25 +488,16 @@ subroutine rkutta(rho,rou,rov,roe,fro,gro,fru,gru,frv,grv,&
   integer :: i,j,nx,ny,ns,k 
 !	
 !coefficient for RK sub-time steps
-        coef(1,1)=8.0d0/15.0d0*dlt
-        coef(1,2)=5.0d0/12.0d0*dlt
-        coef(1,3)=3.0d0/4.0d0*dlt
-        coef(2,1)=0.0d0
-        coef(2,2)=-17.0d0/60.0d0*dlt
-        coef(2,3)=-5.0d0/12.0d0*dlt
-
-        
+!!        coef(1,1)=XXX
+!!        coef(1,2)=XXX
+!!        coef(1,3)=XXX
+!!        coef(2,1)=XXX
+!!        coef(2,2)=XXX
+!!        coef(2,3)=XXX
 
   do j=1,ny
      do i=1,nx
-      rho(i,j)=rho(i,j)+coef(1,k)*fro(i,j)+coef(2,k)*gro(i,j)
-      gro(i,j)=fro(i,j)
-      rou(i,j)=rou(i,j)+coef(1,k)*fru(i,j)+coef(2,k)*gru(i,j)
-      gru(i,j)=fru(i,j)
-      rov(i,j)=rov(i,j)+coef(1,k)*frv(i,j)+coef(2,k)*grv(i,j)
-      grv(i,j)=frv(i,j)
-      roe(i,j)=roe(i,j)+coef(1,k)*fre(i,j)+coef(2,k)*gre(i,j)
-      gre(i,j)=fre(i,j)
+!!
      enddo
   enddo
 
@@ -678,8 +622,8 @@ subroutine param(xlx,yly,xmu,xba,gma,roi,cci,d,tpi,chv,uu0)
   chv=1./gma
   xlx=4.*d     !DOMAIN SIZE X DIRECTION
   yly=4.*d     !DOMAIN SIZE Y DIRECTION
-  uu0=mach*cci
-  xmu=roi*uu0*d/ren
+  uu0=-mach*cci
+  xmu=roi*abs(uu0)*d/ren
   xba=xmu/pdl
   tpi=cci**2/(gma-1)
   

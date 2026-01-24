@@ -582,7 +582,7 @@ subroutine initl(uuu,vvv,rho,eee,pre,tmp,rou,rov,roe,nx,ny,&
   do j=1,ny
      do i=1,nx
         uuu(i,j)=uu0
-        vvv(i,j)=0.01*(sin(4.*pi*(i)*dlx/xlx)&
+        vvv(i,j)=0.01*(-sin(4.*pi*(i)*dlx/xlx)&
              +sin(7.*pi*(i)*dlx/xlx))*&
              exp(-(j*dly-yly/2.)**2)
         tmp(i,j)=tpi
@@ -622,8 +622,8 @@ subroutine param(xlx,yly,xmu,xba,gma,roi,cci,d,tpi,chv,uu0)
   chv=1./gma
   xlx=4.*d     !DOMAIN SIZE X DIRECTION
   yly=4.*d     !DOMAIN SIZE Y DIRECTION
-  uu0=mach*cci
-  xmu=roi*uu0*d/ren
+  uu0=-mach*cci
+  xmu=roi*abs(uu0)*d/ren
   xba=xmu/pdl
   tpi=cci**2/(gma-1)
   

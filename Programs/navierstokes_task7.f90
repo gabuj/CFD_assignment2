@@ -8,7 +8,7 @@ program navierstokes
 !
   implicit none   !-->all the variables MUST be declared
 !
-  integer,parameter :: nx=129,ny=129,nt=10000,ns=3,nf=3,mx=nf*nx,my=nf*ny
+  integer,parameter :: nx=513,ny=257,nt=75000,ns=3
   !size of the computational domain (nx x ny) 
   !size of the exchanger (mx x my)
   !number of time step for the simulation
@@ -17,11 +17,11 @@ program navierstokes
   real(8),dimension(nx,ny) :: uuu,vvv,rho,eee,pre,tmp,rou,rov,wz,tuu,tvv
   real(8),dimension(nx,ny) :: roe,tb1,tb2,tb3,tb4,tb5,tb6,tb7,tb8,tb9
   real(8),dimension(nx,ny) :: tba,tbb,fro,fru,frv,fre,gro,gru,grv,gre,rot,eps
-  real(8),dimension(mx) :: xx
-  real(8),dimension(my) :: yy
-  real(8),dimension(mx,my) :: tf
+  real(8),dimension(nx) :: xx
+  real(8),dimension(ny) :: yy
+  real(8),dimension(nx,ny) :: tf
   real(8),dimension(2,ns) :: coef
-  integer :: i,j,itemp,k,n,nxm,iread,ni,nj,isave,longueur,imodulo
+  integer :: i,j,itemp,k,n,nxm,iread,ni,nj,isave,longueur, tracer
   real(8) :: xlx,yly,CFL,dlx,dx,xmu,xkt,um0,vm0,tm0
   real(8) :: xba,gma,uu0,dlt,um,vm,tm,x,y,dy
 !**************************************************
@@ -31,11 +31,10 @@ program navierstokes
 !*******************************************
   !Name of the file for visualisation:
 990 format('vort',I4.4)
-  imodulo=2500 !snapshots to be saved every imodulo time steps
 
   ! AB2 temporal scheme itemp=1
   ! RK3 temporal scheme itemp=2
-  itemp=2
+  itemp=1
 
   ! Subroutine for the initialisation of the variables 
   call initl(uuu,vvv,rho,eee,pre,tmp,rou,rov,roe,nx,ny,xlx,yly, &
@@ -46,6 +45,7 @@ program navierstokes
   dy=yly/ny !mesh sixe in y
   CFL=0.25  !CFL number for time step
   dlt=CFL*dlx
+  tracer=1
   print *,'The time step of the simulation is',dlt
   
   !Computation of the average velocities at t=0
@@ -56,72 +56,52 @@ program navierstokes
 !BEGINNING OF TIME LOOP
   do n=1,nt
      if (itemp.eq.1) then   !TEMPORAL SCHEME AB2
-      
+        
         call fluxx(uuu,vvv,rho,pre,tmp,rou,rov,roe,nx,ny,tb1,tb2,tb3,tb4, &
-             tb5,tb6,tb7,tb8,tb9,tba,tbb,fro,fru,frv,fre,xlx,yly,xmu,xba,eps,xkt)
+             tb5,tb6,tb7,tb8,tb9,tba,tbb,fro,fru,frv,fre,xlx,yly,xmu,xba,eps,xkt)    
+
+        call boundary(rho,rou,rov,roe,nx,ny,uu0,dlt,dx,xlx,yly,xmu,xba,gma)
 
         call adams(rho,rou,rov,roe,fro,gro,fru,gru,frv,grv,&
              fre,gre,nx,ny,dlt)
         
         call state(uuu,vvv,rho,pre,tmp,rou,rov,roe,nx,ny,gma)
-        
-     endif
-        
-     if (itemp.eq.2) then !TEMPORAL SCHEME RK3
-        
-        !loop for sub-time steps
-        do k=1,ns
 
-           call fluxx(uuu,vvv,rho,pre,tmp,rou,rov,roe,nx,ny,tb1,tb2,tb3,tb4,&
-                tb5,tb6,tb7,tb8,tb9,tba,tbb,fro,fru,frv,fre,xlx,yly,xmu,xba,eps,xkt)
-       
-           call rkutta(rho,rou,rov,roe,fro,gro,fru,gru,frv,grv,&
-                fre,gre,nx,ny,ns,dlt,coef,k)
-	   
-           call state(uuu,vvv,rho,pre,tmp,rou,rov,roe,nx,ny,gma)
-           
-        enddo
      endif
-     !loop for the snapshots, to be save every imodulo
-     if (mod(n,imodulo).eq.0) then
+        
+     
+     !loop for the snapshots, to be save if n = 9000 or 10000
+     
+     if (n == nt-500 .or. n == nt) then
         !this is design for Gnuplot but feel free to implement your
         !own code if you want to use Matlab or Paraview
-        write(nfile, 990) n/imodulo
+        write(nfile, 990) tracer
+        tracer=tracer+1
         x=0.
-        do i=1,mx
+        do i=1,nx
            xx(i)=x
            x=x+dx 
         enddo
         y=0.
-        do j=1,my
+        do j=1,ny
            yy(j)=y
            y=y+dy
         enddo
 
         !computation of the vorticity
-        call derix4(vvv,nx,ny,tvv,xlx)
-        call deriy4(uuu,nx,ny,tuu,yly)
+        call derix(vvv,nx,ny,tvv,xlx)
+        call deriy(uuu,nx,ny,tuu,yly)
         do j=1,ny
         do i=1,nx
            wz(i,j)=tvv(i,j)-tuu(i,j)
         enddo
         enddo
         
-        !using periodicity we copy the vorticity for the heat exchanger
-        do ni=1,nf
-        do nj=1,nf
-           do j=1,ny
-           do i=1,nx
-              tf(i+(ni-1)*nx,j+(nj-1)*ny)=wz(i,j)
-           enddo
-           enddo
-        enddo
-        enddo
         !this file will be used by gnuplot for visualisations
         open(21,file=nfile,form='formatted',status='unknown')
-        do j=1,my
-        do i=1,mx
-           write(21,*)  xx(i),yy(j),tf(i,j)
+        do j=1,ny
+        do i=1,nx
+           write(21,*)  xx(i),yy(j),wz(i,j)
         enddo
         write(21,*)
         enddo
@@ -184,11 +164,11 @@ subroutine derix(phi,nx,ny,dfi,xlx)
   dlx=xlx/nx
   udx=1./(dlx+dlx)
   do j=1,ny
-     dfi(1,j)=udx*(phi(2,j)-phi(nx,j))
+     dfi(1,j)=udx*(-1.*phi(3,j)+4.*phi(2,j)-3.*phi(1,j)) ! one-sided second-order difference at the boundary
      do i=2,nx-1
         dfi(i,j)=udx*(phi(i+1,j)-phi(i-1,j))
      enddo
-     dfi(nx,j)=udx*(phi(1,j)-phi(nx-1,j))
+     dfi(nx,j)=udx*((1.*phi(nx-2,j)-4.*phi(nx-1,j)+3.*phi(nx,j))) ! one-sided second-order difference at the boundary
   enddo
 	
   return
@@ -240,12 +220,12 @@ subroutine derxx(phi,nx,ny,dfi,xlx)
   dlx=xlx/nx
   udx=1./(dlx*dlx)
   do j=1,ny
-     dfi(1,j)=udx*(phi(2,j)-(phi(1,j)+phi(1,j))+phi(nx,j))
+     dfi(1,j)=udx*(2*phi(1,j)-5*phi(2,j)+ 4*phi(3,j)-phi(4,j)) ! one-sided 2nd order difference at the boundary
      do i=2,nx-1
         dfi(i,j)=udx*(phi(i+1,j)-(phi(i,j)+phi(i,j))&
              +phi(i-1,j))
      enddo
-     dfi(nx,j)=udx*(phi(1,j)-(phi(nx,j)+phi(nx,j))+phi(nx-1,j))
+     dfi(nx,j)=udx*(2*phi(nx,j)-5*phi(nx-1,j)+ 4*phi(nx-2,j)-phi(nx-3,j)) ! one-sided 2nd order difference at the boundary
   enddo
 	
   return
@@ -282,129 +262,6 @@ subroutine deryy(phi,nx,ny,dfi,yly)
 end subroutine deryy
 !############################################
 
-!############################################
-!
-subroutine derix4(phi,nx,ny,dfi,xlx)
-!
-!Fourth-order first derivative in the x direction
-!############################################
-  
-  implicit none
-
-  real(8),dimension(nx,ny) :: phi,dfi
-  real(8) :: dlx,xlx,udx
-  integer :: i,j,nx,ny,im1,im2,ip1,ip2
-	
-   dlx=xlx/nx
-   udx = 1.0d0 / (12.0d0 * dlx)
-
-  do j=1,ny
-     do i=1,nx
-        im1 = i - 1; if (im1 < 1) im1 = im1 + nx
-        im2 = i - 2; if (im2 < 1) im2 = im2 + nx
-        ip1 = i + 1; if (ip1 > nx) ip1 = ip1 - nx
-        ip2 = i + 2; if (ip2 > nx) ip2 = ip2 - nx
-
-        dfi(i,j) = udx * (phi(im2,j) - 8.0d0*phi(im1,j) + 8.0d0*phi(ip1,j) - phi(ip2,j))
-     enddo
-  enddo
-
-	
-  return
-end subroutine derix4
-!############################################
-
-!############################################
-!
-subroutine deriy4(phi,nx,ny,dfi,yly)
-!
-!Fourth-order first derivative in the y direction
-!############################################
-
-  implicit none
-  
-  real(8),dimension(nx,ny) ::  phi,dfi
-  real(8) :: dly,yly,udy
-  integer :: i,j,nx,ny,jm1,jm2,jp1,jp2
-	
-  dly=yly/ny
-  udy = 1.0d0 / (12.0d0 * dly)
-
-  do j=1,ny
-     jm1 = j - 1; if (jm1 < 1) jm1 = jm1 + ny
-     jm2 = j - 2; if (jm2 < 1) jm2 = jm2 + ny
-     jp1 = j + 1; if (jp1 > ny) jp1 = jp1 - ny
-     jp2 = j + 2; if (jp2 > ny) jp2 = jp2 - ny
-     do i=1,nx
-        dfi(i,j) = udy * (phi(i,jm2) - 8.0d0*phi(i,jm1) + 8.0d0*phi(i,jp1) - phi(i,jp2))
-     enddo
-  enddo
-	
-  return
-end subroutine deriy4
-!############################################
-
-!############################################
-!
-subroutine derxx4(phi,nx,ny,dfi,xlx)
-!
-!Fourth-order second derivative in y direction
-!############################################
-
-  implicit none
-
-  real(8),dimension(nx,ny) ::  phi,dfi
-  real(8) :: dlx,xlx,udx
-  integer :: i,j,nx,ny,im1,im2,ip1,ip2
-  
-  dlx=xlx/nx
-  udx = 1.0d0 / (12.0d0 * dlx * dlx)
-
-  do j=1,ny
-     do i=1,nx
-        im1 = i - 1; if (im1 < 1) im1 = im1 + nx
-        im2 = i - 2; if (im2 < 1) im2 = im2 + nx
-        ip1 = i + 1; if (ip1 > nx) ip1 = ip1 - nx
-        ip2 = i + 2; if (ip2 > nx) ip2 = ip2 - nx
-
-        dfi(i,j) = udx * (-phi(im2,j) + 16.0d0*phi(im1,j) - 30.0d0*phi(i,j) + 16.0d0*phi(ip1,j) - phi(ip2,j))
-     enddo
-  enddo
-	
-  return
-end subroutine derxx4
-!############################################
-
-!############################################
-!
-subroutine deryy4(phi,nx,ny,dfi,yly)
-!
-!Fourth-order second derivative in the y direction
-!############################################
-
-  implicit none
-
-  real(8),dimension(nx,ny) ::  phi,dfi
-  real(8) :: dly,yly,udy
-  integer :: i,j,nx,ny,jm1,jm2,jp1,jp2
-  dly=yly/ny
-  udy = 1.0d0 / (12.0d0 * dly * dly)
-
-  do j=1,ny
-     jm1 = j - 1; if (jm1 < 1) jm1 = jm1 + ny
-     jm2 = j - 2; if (jm2 < 1) jm2 = jm2 + ny
-     jp1 = j + 1; if (jp1 > ny) jp1 = jp1 - ny
-     jp2 = j + 2; if (jp2 > ny) jp2 = jp2 - ny
-     do i=1,nx
-        dfi(i,j) = udy * (-phi(i,jm2) + 16.0d0*phi(i,jm1) - 30.0d0*phi(i,j) &
-                           + 16.0d0*phi(i,jp1) - phi(i,jp2))
-     enddo
-  enddo
-	
-  return
-end subroutine deryy4
-!############################################
-
 
 !#######################################################################
 !
@@ -422,10 +279,10 @@ subroutine fluxx(uuu,vvv,rho,pre,tmp,rou,rov,roe,nx,ny,tb1,tb2,tb3,&
   real(8) :: utt,qtt,xmu,dmu,xlx,yly,xba,xkt
   integer :: i,j,nx,ny
 
-  call derix4(rou,nx,ny,tb1,xlx)
-  call deriy4(rov,nx,ny,tb2,yly)
+  call derix(rou,nx,ny,tb1,xlx)
+  call deriy(rov,nx,ny,tb2,yly)
   do j=1,ny
-     do i=1,nx
+     do i=1,nx-1
         fro(i,j)=-tb1(i,j)-tb2(i,j)
      enddo
   enddo
@@ -437,13 +294,13 @@ subroutine fluxx(uuu,vvv,rho,pre,tmp,rou,rov,roe,nx,ny,tb1,tb2,tb3,&
      enddo
   enddo
 	
-  call derix4(pre,nx,ny,tb3,xlx)
-  call derix4(tb1,nx,ny,tb4,xlx)
-  call deriy4(tb2,nx,ny,tb5,yly)
-  call derxx4(uuu,nx,ny,tb6,xlx)
-  call deryy4(uuu,nx,ny,tb7,yly)
-  call derix4(vvv,nx,ny,tb8,xlx)
-  call deriy4(tb8,nx,ny,tb9,yly)
+  call derix(pre,nx,ny,tb3,xlx)
+  call derix(tb1,nx,ny,tb4,xlx)
+  call deriy(tb2,nx,ny,tb5,yly)
+  call derxx(uuu,nx,ny,tb6,xlx)
+  call deryy(uuu,nx,ny,tb7,yly)
+  call derix(vvv,nx,ny,tb8,xlx)
+  call deriy(tb8,nx,ny,tb9,yly)
   utt=1./3
   qtt=4./3
   do j=1,ny
@@ -461,13 +318,13 @@ subroutine fluxx(uuu,vvv,rho,pre,tmp,rou,rov,roe,nx,ny,tb1,tb2,tb3,&
      enddo
   enddo
 	
-  call deriy4(pre,nx,ny,tb3,yly)
-  call derix4(tb1,nx,ny,tb4,xlx)
-  call deriy4(tb2,nx,ny,tb5,yly)
-  call derxx4(vvv,nx,ny,tb6,xlx)
-  call deryy4(vvv,nx,ny,tb7,yly)
-  call derix4(uuu,nx,ny,tb8,xlx)
-  call deriy4(tb8,nx,ny,tb9,yly)
+  call deriy(pre,nx,ny,tb3,yly)
+  call derix(tb1,nx,ny,tb4,xlx)
+  call deriy(tb2,nx,ny,tb5,yly)
+  call derxx(vvv,nx,ny,tb6,xlx)
+  call deryy(vvv,nx,ny,tb7,yly)
+  call derix(uuu,nx,ny,tb8,xlx)
+  call deriy(tb8,nx,ny,tb9,yly)
   do j=1,ny
      do i=1,nx
         tbb(i,j)=xmu*(tb6(i,j)+qtt*tb7(i,j)+utt*tb9(i,j))
@@ -479,10 +336,10 @@ subroutine fluxx(uuu,vvv,rho,pre,tmp,rou,rov,roe,nx,ny,tb1,tb2,tb3,&
 !
 !Equation for the energy
 !
-  call derix4(uuu,nx,ny,tb1,xlx)
-  call deriy4(vvv,nx,ny,tb2,yly)
-  call deriy4(uuu,nx,ny,tb3,yly)
-  call derix4(vvv,nx,ny,tb4,xlx)
+  call derix(uuu,nx,ny,tb1,xlx)
+  call deriy(vvv,nx,ny,tb2,yly)
+  call deriy(uuu,nx,ny,tb3,yly)
+  call derix(vvv,nx,ny,tb4,xlx)
   dmu=2./3*xmu
   do j=1,ny
      do i=1,nx
@@ -502,12 +359,12 @@ subroutine fluxx(uuu,vvv,rho,pre,tmp,rou,rov,roe,nx,ny,tb1,tb2,tb3,&
      enddo
   enddo
 
-  call derix4(tb1,nx,ny,tb5,xlx)
-  call derix4(tb2,nx,ny,tb6,xlx)
-  call deriy4(tb3,nx,ny,tb7,yly)
-  call deriy4(tb4,nx,ny,tb8,yly)
-  call derxx4(tmp,nx,ny,tb9,xlx)
-  call deryy4(tmp,nx,ny,tba,yly)
+  call derix(tb1,nx,ny,tb5,xlx)
+  call derix(tb2,nx,ny,tb6,xlx)
+  call deriy(tb3,nx,ny,tb7,yly)
+  call deriy(tb4,nx,ny,tb8,yly)
+  call derxx(tmp,nx,ny,tb9,xlx)
+  call deryy(tmp,nx,ny,tba,yly)
    
   do j=1,ny
      do i=1,nx
@@ -519,47 +376,6 @@ subroutine fluxx(uuu,vvv,rho,pre,tmp,rou,rov,roe,nx,ny,tb1,tb2,tb3,&
 end subroutine fluxx
 !#######################################################################
 
-!###########################################################
-!
-subroutine rkutta(rho,rou,rov,roe,fro,gro,fru,gru,frv,grv,&
-     fre,gre,nx,ny,ns,dlt,coef,k)
-!
-!###########################################################
-
-  implicit none
-!
-  real(8),dimension(nx,ny) :: rho,rou,rov,roe,fro,gro,fru,gru,frv
-  real(8),dimension(nx,ny) :: grv,fre,gre
-  real(8),dimension(2,ns) :: coef
-  real(8) :: dlt
-  integer :: i,j,nx,ny,ns,k 
-!	
-!coefficient for RK sub-time steps
-        coef(1,1)=8.0d0/15.0d0*dlt
-        coef(1,2)=5.0d0/12.0d0*dlt
-        coef(1,3)=3.0d0/4.0d0*dlt
-        coef(2,1)=0.0d0
-        coef(2,2)=-17.0d0/60.0d0*dlt
-        coef(2,3)=-5.0d0/12.0d0*dlt
-
-        
-
-  do j=1,ny
-     do i=1,nx
-      rho(i,j)=rho(i,j)+coef(1,k)*fro(i,j)+coef(2,k)*gro(i,j)
-      gro(i,j)=fro(i,j)
-      rou(i,j)=rou(i,j)+coef(1,k)*fru(i,j)+coef(2,k)*gru(i,j)
-      gru(i,j)=fru(i,j)
-      rov(i,j)=rov(i,j)+coef(1,k)*frv(i,j)+coef(2,k)*grv(i,j)
-      grv(i,j)=frv(i,j)
-      roe(i,j)=roe(i,j)+coef(1,k)*fre(i,j)+coef(2,k)*gre(i,j)
-      gre(i,j)=fre(i,j)
-     enddo
-  enddo
-
-  return
-end subroutine rkutta
-!###########################################################
 
 !###########################################################
 !
@@ -578,7 +394,7 @@ subroutine adams(rho,rou,rov,roe,fro,gro,fru,gru,frv,grv,&
   ct1=1.5*dlt
   ct2=0.5*dlt
   do j=1,ny
-     do i=1,nx
+     do i=2,nx-1
         rho(i,j)=rho(i,j)+ct1*fro(i,j)-ct2*gro(i,j)
         gro(i,j)=fro(i,j)
         rou(i,j)=rou(i,j)+ct1*fru(i,j)-ct2*gru(i,j)
@@ -611,7 +427,7 @@ subroutine initl(uuu,vvv,rho,eee,pre,tmp,rou,rov,roe,nx,ny,&
 
   call param(xlx,yly,xmu,xba,gma,roi,cci,d,tpi,chv,uu0)
 
-  epsi=0.1
+  epsi=0.1 
   dlx=xlx/nx
   dly=yly/ny
   ct3=log(2.)
@@ -627,7 +443,7 @@ subroutine initl(uuu,vvv,rho,eee,pre,tmp,rou,rov,roe,nx,ny,&
 !##########CIRCULAR CYLINDER DEFINITION#################################
   do j=1,ny
      do i=1,nx
-        if (((i*dlx-xlx/2.)**2+(j*dly-yly/2.)**2).lt.radius**2) then
+        if (((i*dlx-5.*d)**2+(j*dly-yly/2.)**2).lt.radius**2) then
            eps(i,j)=1.
         else
            eps(i,j)=0.
@@ -659,7 +475,40 @@ end subroutine initl
 
 !################################################################
 !
+
+subroutine boundary(rho,rou,rov,roe,nx,ny,uu0,dlt,dx,xlx,yly,xmu,xba,gma)
+
+  implicit none
+  integer :: nx, ny, j
+  real(8) :: xlx,yly,xmu,xba,gma,roi,cci,d,tpi,chv,uu0
+  real(8), dimension(nx,ny) :: rho,rou,rov,roe
+  real(8) :: dlt, dx, c_conv
+
+  call param(xlx,yly,xmu,xba,gma,roi,cci,d,tpi,chv,uu0)
+  
+  c_conv = (uu0 * dlt) / dx ! convective speed at outflow
+
+  do j=1,ny
+   ! INFLOW (x=1): Dirichlet BC
+     rho(1,j) = roi
+     rou(1,j) = roi*uu0
+     rov(1,j) = 0.
+     roe(1,j) = roi*(chv*tpi+0.5*uu0*uu0)
+
+     ! OUTFLOW (x=nx): simple convective boundary condition
+     rho(nx,j) = rho(nx,j) - c_conv * (rho(nx,j) - rho(nx-1,j))
+     rou(nx,j) = rou(nx,j) - c_conv * (rou(nx,j) - rou(nx-1,j))
+     rov(nx,j) = rov(nx,j) - c_conv * (rov(nx,j) - rov(nx-1,j))
+     roe(nx,j) = roe(nx,j) - c_conv * (roe(nx,j) - roe(nx-1,j))
+     
+  enddo
+
+
+end subroutine boundary
+!################################################################
+
 subroutine param(xlx,yly,xmu,xba,gma,roi,cci,d,tpi,chv,uu0)
+
 !
 !################################################################
 
@@ -674,10 +523,10 @@ subroutine param(xlx,yly,xmu,xba,gma,roi,cci,d,tpi,chv,uu0)
   cci=1.   !SOUND SPEED
   d=1.     !DIAMETER CYLINDER
   gma=1.4
-	
+
   chv=1./gma
-  xlx=4.*d     !DOMAIN SIZE X DIRECTION
-  yly=4.*d     !DOMAIN SIZE Y DIRECTION
+  xlx=20.*d     !DOMAIN SIZE X DIRECTION
+  yly=12.*d     !DOMAIN SIZE Y DIRECTION
   uu0=mach*cci
   xmu=roi*uu0*d/ren
   xba=xmu/pdl
